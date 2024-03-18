@@ -81,17 +81,16 @@ endif()
 if(NOT cuTensorNet_FOUND)
   message(STATUS "cuTensorNet not found. Downloading library. By continuing this download you accept to the license terms of cuQuantum SDK")
 
-  set(CUTENSORNET_FILENAME cuquantum-linux-x86_64-${CUTENSORNET_VERSION}-archive)
+  set(CUTENSORNET_FILENAME cuquantum-linux-x86_64-${CUTENSORNET_VERSION}_cuda${CUDAToolkit_VERSION_MAJOR}-archive)
   
   CPMAddPackage(
                NAME cutensornet
                VERSION ${CUTENSORNET_VERSION}
                URL https://developer.download.nvidia.com/compute/cuquantum/redist/cuquantum/linux-x86_64/${CUTENSORNET_FILENAME}.tar.xz
-               # Eigen's CMakelists are not intended for library use
                DOWNLOAD_ONLY YES 
                )
       
-  set(cuTensorNet_LIBRARY ${cutensornet_SOURCE_DIR}/lib/${CUDAToolkit_VERSION_MAJOR}/libcutensornet.so) 
+  set(cuTensorNet_LIBRARY ${cutensornet_SOURCE_DIR}/lib/libcutensornet.so) 
   set(cuTensorNet_INCLUDE_DIR ${cutensornet_SOURCE_DIR}/include) 
 
   set(cuTensorNet_FOUND TRUE)

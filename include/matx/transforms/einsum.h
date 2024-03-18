@@ -454,7 +454,7 @@ struct EinsumParamsKeyEq {
 
 template <typename... InT>
 // Static caches of covariance matrices
-static matxCache_t<EinsumParams_t<InT...>, EinsumParamsKeyHash<InT...>, EinsumParamsKeyEq<InT...>> einsum_cache;
+using einsum_cuda_cache_t = std::unordered_map<EinsumParams_t<InT...>, std::any, EinsumParamsKeyHash<InT...>, EinsumParamsKeyEq<InT...>>;
 } // end namespace cutensor
 } // end namespace detail
 } // end namespace matx
@@ -494,17 +494,17 @@ namespace cutensor {
     auto params = matx::detail::cutensor::matxEinsumHandle_t<OutputType, InT...>::GetEinsumParams(out, subscripts, tensors...);
     params.stream = stream;
 
-    auto ret = matx::detail::cutensor::einsum_cache<InT...>.Lookup(params);
-    if (ret == std::nullopt) {
-      auto tmp = new matx::detail::cutensor::matxEinsumHandle_t<OutputType, InT...>{out, subscripts, stream, tensors...};
-      matx::detail::cutensor::einsum_cache<InT...>.Insert(params, static_cast<void *>(tmp));
-
-      tmp->Exec(out, stream, tensors...);
-    }
-    else {
-      auto einsum_type = static_cast<matx::detail::cutensor::matxEinsumHandle_t<OutputType, InT...> *>(ret.value());
-      einsum_type->Exec(out, stream, tensors...);
-    }
+    using cache_val_type = matx::detail::cutensor::matxEinsumHandle_t<OutputType, InT...>;
+    detail::GetCache().LookupAndExec<detail::cutensor::einsum_cuda_cache_t<InT...>>(
+      detail::CacheName::EINSUM,
+      params,
+      [&]() {
+        return std::make_shared<cache_val_type>(out, subscripts, stream, tensors...);
+      },
+      [&](std::shared_ptr<cache_val_type> ctype) {
+        ctype->Exec(out, stream, tensors...);
+      }
+    );    
 #endif    
   }
 }

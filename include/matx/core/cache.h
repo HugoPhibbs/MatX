@@ -55,7 +55,8 @@ enum class CacheName {
   GEMM,
   COV,
   FILTER,
-  INV
+  INV,
+  EINSUM
 };
 
 
@@ -70,7 +71,9 @@ class matxCache_t {
 public:
   matxCache_t() {}
   ~matxCache_t() {
-    // Destroy all outstanding objects in the cache to free memory
+    // Destroy all outstanding objects in the cache to free memory. Synchronize the device and free
+    // on the default stream in case the user had deleted the stream elsewhere
+    cudaDeviceSynchronize();
     for (auto &[k, v]: cache) {
       v.reset(); 
     }
