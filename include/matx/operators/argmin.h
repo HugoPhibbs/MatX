@@ -48,41 +48,59 @@ namespace detail {
   {
     private:
       OpA a_;
+      cuda::std::array<index_t, ORank> out_dims_;
+      mutable detail::tensor_impl_t<index_t, ORank> tmp_out_;
+      mutable typename remove_cvref_t<OpA>::scalar_type *ptr;   
 
     public:
       using matxop = bool;
       using scalar_type = typename remove_cvref_t<OpA>::scalar_type;
       using matx_transform_op = bool;
-      using argmin_xform_op = bool;
+      using argmax_xform_op = bool;
 
       __MATX_INLINE__ std::string str() const { return "argmin(" + get_type_str(a_) + ")"; }
-      __MATX_INLINE__ ArgMinOp(OpA a) : a_(a) {
-     
+      __MATX_INLINE__ ArgMinOp(OpA a) : a_(a) { 
+        for (int r = 0; r < ORank; r++) {
+          out_dims_[r] = a_.Size(r);
+        } 
       };
 
       template <typename... Is>
-      __MATX_INLINE__ __MATX_DEVICE__ __MATX_HOST__ decltype(auto) operator()(Is... indices) const = delete;
+      __MATX_INLINE__ __MATX_DEVICE__ __MATX_HOST__ decltype(auto) operator()(Is... indices) const {
+        return tmp_out_(indices...);
+      };
 
       template <typename Out, typename Executor>
       void Exec(Out &&out, Executor &&ex) const {
-        static_assert(cuda::std::tuple_size_v<remove_cvref_t<Out>> == 3, "Must use mtie with 2 outputs on argmin(). ie: (mtie(O, I) = argmin(A))");   
-        argmin_impl(cuda::std::get<0>(out), cuda::std::get<1>(out), a_, ex);
+        argmin_impl(cuda::std::get<0>(out), a_, ex);
       }
 
       static __MATX_INLINE__ constexpr __MATX_HOST__ __MATX_DEVICE__ int32_t Rank()
       {
-        return matxNoRank;
+        return ORank;
       }
+
+      template <typename ShapeType, typename Executor>
+      __MATX_INLINE__ void InnerPreRun([[maybe_unused]] ShapeType &&shape, Executor &&ex) const noexcept
+      {
+        if constexpr (is_matx_op<OpA>()) {
+          a_.PreRun(std::forward<ShapeType>(shape), std::forward<Executor>(ex));
+        }       
+      }      
 
       template <typename ShapeType, typename Executor>
       __MATX_INLINE__ void PreRun([[maybe_unused]] ShapeType &&shape, Executor &&ex) const noexcept
       {
-        MATX_ASSERT_STR(false, matxNotSupported, "argmin() must only be called with a single assignment since it has multiple return types");
+        InnerPreRun(std::forward<ShapeType>(shape), std::forward<Executor>(ex));    
+
+        detail::AllocateTempTensor(tmp_out_, std::forward<Executor>(ex), out_dims_, &ptr);
+
+        Exec(cuda::std::make_tuple(tmp_out_), std::forward<Executor>(ex));
       }
 
       constexpr __MATX_INLINE__ __MATX_HOST__ __MATX_DEVICE__ index_t Size(int dim) const
       {
-        return 0;
+        return out_dims_[dim];
       }
 
   };

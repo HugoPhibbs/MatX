@@ -382,6 +382,34 @@ struct EndOffset {
   stride_type offset_;
 };
 
+// This class is to mimic the behavior of CUB's KeyValuePair class, but allows
+// storing elements into a key and a value tensor rather than a single struct
+template <typename KeyOp, typename ValOp>
+struct KeyValueIterator {
+  using Value = typename ValOp::scalar_type;
+  using Key = typename KeyOp::scalar_type;
+  using difference_type = int;
+
+  KeyOp keyOp_;
+  ValOp valOp_;
+
+  KeyValueIterator(KeyOp &keyOp, ValOp &valOp) : keyOp_(keyOp), valOp_(valOp) {}
+
+  Value value;
+  Key key;
+  
+  [[nodiscard]] __MATX_INLINE__ __MATX_HOST__ __MATX_DEVICE__ stride_type operator[](difference_type off)
+  {
+    keyOp_[off] = 
+    return cub::KeyValuePair<int, Value>{off, };
+  }  
+
+  __MATX_INLINE__ __MATX_HOST__ __MATX_DEVICE__ bool operator !=(const KeyValueIterator &b)
+  {
+      return (value != b.value) || (key != b.key);
+  }  
+};
+
 
 
 template <typename OperatorType>

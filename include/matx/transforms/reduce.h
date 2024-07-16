@@ -2068,25 +2068,19 @@ void __MATX_INLINE__ max_impl(OutType dest, const InType &in, [[maybe_unused]] H
  *
  * @param dest
  *   Destination view of reduction
- * @param idest
- *   Destination for indices
  * @param in
  *   Input data to reduce
  * @param exec
  *   CUDA executor or stream ID
  */
-template <typename OutType, typename TensorIndexType, typename InType>
-void __MATX_INLINE__ argmax_impl(OutType dest, TensorIndexType &idest, const InType &in, cudaExecutor exec = 0)
+template <typename OutType, typename InType>
+void __MATX_INLINE__ argmax_impl(OutType dest, const InType &in, cudaExecutor exec = 0)
 {
 #ifdef __CUDACC__
-  MATX_NVTX_START("argmax_impl(" + get_type_str(in) + ")", matx::MATX_NVTX_LOG_API)
+  MATX_NVTX_START("max_impl(" + get_type_str(in) + ")", matx::MATX_NVTX_LOG_API)
 
   cudaStream_t stream = exec.getStream();
-  // example-begin reduce-2
-  // Reduce "in" into both "dest" and "idest" using a max operation for the reduction. "dest" will contain
-  // the reduced values while "idest" will include the indices of the reduced values
-  reduce(dest, idest, in, detail::reduceOpMax<typename OutType::scalar_type>(), stream, true);
-  // example-end reduce-2
+  cub_argmax<OutType, InType>(dest, in, stream);
 #endif
 }
 
@@ -2097,22 +2091,18 @@ void __MATX_INLINE__ argmax_impl(OutType dest, TensorIndexType &idest, const InT
  *
  * @tparam OutType
  *   Output data type
- * @tparam TensorIndexType
- *   Output type stpring indices
  * @tparam InType
  *   Input data type
  *
  * @param dest
  *   Destination view of reduction
- * @param idest
- *   Destination for indices
  * @param in
  *   Input data to reduce
  * @param exec
  *   Single threaded host executor
  */
-template <typename OutType, typename TensorIndexType, typename InType, ThreadsMode MODE>
-void __MATX_INLINE__ argmax_impl(OutType dest, TensorIndexType &idest, const InType &in, [[maybe_unused]] HostExecutor<MODE> &exec)
+template <typename OutType, typename InType, ThreadsMode MODE>
+void __MATX_INLINE__ argmax_impl(OutType dest, const InType &in, [[maybe_unused]] HostExecutor<MODE> &exec)
 {
   MATX_NVTX_START("argmax_impl(" + get_type_str(in) + ")", matx::MATX_NVTX_LOG_API)
 
@@ -2128,10 +2118,7 @@ void __MATX_INLINE__ argmax_impl(OutType dest, TensorIndexType &idest, const InT
     }
   };
 
-  // This could be more efficient by not running two reductions to find the same values, but
-  // for brevity this is faster
-  ReduceInput(ft, idest, in);
-  max_impl(dest, in, exec);
+  ReduceInput(ft, dest, in);
 }
 
 
@@ -2211,29 +2198,24 @@ void __MATX_INLINE__ min_impl(OutType dest, const InType &in, [[maybe_unused]] H
  *
  * @tparam OutType
  *   Output data type
- * @tparam TensorIndexType
- *   Output type stpring indices
  * @tparam InType
  *   Input data type
  *
  * @param dest
  *   Destination view of reduction
- * @param idest
- *   Destination for indices
  * @param in
  *   Input data to reduce
  * @param exec
  *   CUDA executor or stream ID
  */
-template <typename OutType, typename TensorIndexType, typename InType>
-void __MATX_INLINE__ argmin_impl(OutType dest, TensorIndexType &idest, const InType &in, cudaExecutor exec = 0)
+template <typename OutType, typename InType>
+void __MATX_INLINE__ argmin_impl(OutType dest, const InType &in, cudaExecutor exec = 0)
 {
-  static_assert(OutType::Rank() == TensorIndexType::Rank());
 #ifdef __CUDACC__
-  MATX_NVTX_START("argmin_impl(" + get_type_str(in) + ")", matx::MATX_NVTX_LOG_API)
+  MATX_NVTX_START("min_impl(" + get_type_str(in) + ")", matx::MATX_NVTX_LOG_API)
 
   cudaStream_t stream = exec.getStream();
-  reduce(dest, idest, in, detail::reduceOpMin<typename OutType::scalar_type>(), stream, true);
+  cub_argmin<OutType, InType>(dest, in, stream);
 #endif
 }
 
@@ -2244,22 +2226,18 @@ void __MATX_INLINE__ argmin_impl(OutType dest, TensorIndexType &idest, const InT
  *
  * @tparam OutType
  *   Output data type
- * @tparam TensorIndexType
- *   Output type stpring indices
  * @tparam InType
  *   Input data type
  *
  * @param dest
  *   Destination view of reduction
- * @param idest
- *   Destination for indices
  * @param in
  *   Input data to reduce
  * @param exec
  *   SIngle host executor
  */
-template <typename OutType, typename TensorIndexType, typename InType, ThreadsMode MODE>
-void __MATX_INLINE__ argmin_impl(OutType dest, TensorIndexType &idest, const InType &in, [[maybe_unused]] HostExecutor<MODE> &exec)
+template <typename OutType, typename InType, ThreadsMode MODE>
+void __MATX_INLINE__ argmin_impl(OutType dest, const InType &in, [[maybe_unused]] HostExecutor<MODE> &exec)
 {
   MATX_NVTX_START("argmin_impl(" + get_type_str(in) + ")", matx::MATX_NVTX_LOG_API)
 
@@ -2275,10 +2253,7 @@ void __MATX_INLINE__ argmin_impl(OutType dest, TensorIndexType &idest, const InT
     }
   };
 
-  // This could be more efficient by not running two reductions to find the same values, but
-  // for brevity this is faster
-  ReduceInput(ft, idest, in);
-  min_impl(dest, in, exec);
+  ReduceInput(ft, dest, in);
 }
 
 

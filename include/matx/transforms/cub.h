@@ -69,7 +69,9 @@ typedef enum {
   CUB_OP_REDUCE,
   CUB_OP_REDUCE_SUM,
   CUB_OP_REDUCE_MIN,
+  CUB_OP_REDUCE_ARGMIN,
   CUB_OP_REDUCE_MAX,
+  CUB_OP_REDUCE_ARGMAX,
   CUB_OP_SELECT,
   CUB_OP_SELECT_IDX,
   CUB_OP_UNIQUE
@@ -173,6 +175,12 @@ public:
     else if constexpr (op == CUB_OP_REDUCE_MAX) {
       ExecMax(a_out, a, stream);
     }
+    else if constexpr (op == CUB_OP_REDUCE_ARGMIN) {
+      ExecArgMin(a_out, a, stream);
+    }
+    else if constexpr (op == CUB_OP_REDUCE_ARGMAX) {
+      ExecArgMax(a_out, a, stream);
+    }    
     else if constexpr (op == CUB_OP_SELECT) {
       ExecSelect(a_out, a, stream);
     }
@@ -831,6 +839,52 @@ inline void ExecSort(OutputTensor &a_out,
   }
 
   /**
+   * Execute a argmin on a tensor
+   *
+   * @note Views being passed must be in row-major order
+   *
+   * @tparam OutputTensor
+   *   Type of output tensor
+   * @tparam InputOperator
+   *   Type of input tensor
+   * @param a_out
+   *   Output tensor
+   * @param a
+   *   Input tensor
+   * @param stream
+   *   CUDA stream
+   *
+   */
+  inline void ExecArgMin(OutputTensor &a_out,
+                       const InputOperator &a,
+                       const cudaStream_t stream)
+  {
+#ifdef __CUDACC__
+    MATX_NVTX_START("", matx::MATX_NVTX_LOG_INTERNAL)
+    typename detail::base_type_t<InputOperator> in_base = a;
+    typename detail::base_type_t<OutputTensor> out_base = a_out;
+
+    // Check whether this is a segmented reduction or single-value output. Segmented reductions are any
+    // type of reduction where there's not a single output, since any type of reduction can be generalized
+    // to a segmented type
+    if constexpr (OutputTensor::Rank() > 0) {
+      auto ft = [&](auto &&in, auto &&out, auto &&begin, auto &&end) {
+          return cub::DeviceSegmentedReduce::ArgMin(d_temp, temp_storage_bytes, in, out, static_cast<int>(TotalSize(out_base)), begin, end, stream);
+      };
+      auto rv = ReduceInput(ft, out_base, in_base);
+      MATX_ASSERT_STR_EXP(rv, cudaSuccess, matxCudaError, "Error in cub::DeviceSegmentedReduce::ArgMin");
+    }
+    else {
+      auto ft = [&](auto &&in, auto &&out, [[maybe_unused]] auto &&unused1, [[maybe_unused]] auto &&unused2) {
+        return cub::DeviceReduce::ArgMin(d_temp, temp_storage_bytes, in, out, static_cast<int>(TotalSize(in_base)), stream);
+      };
+      auto rv = ReduceInput(ft, out_base, in_base);
+      MATX_ASSERT_STR_EXP(rv, cudaSuccess, matxCudaError, "Error in cub::DevicdReduce::ArgMin");
+    }
+#endif
+  }  
+
+  /**
    * Execute a max on a tensor
    *
    * @note Views being passed must be in row-major order
@@ -877,6 +931,53 @@ inline void ExecSort(OutputTensor &a_out,
     }
 #endif
   }
+
+
+    /**
+   * Execute a argmin on a tensor
+   *
+   * @note Views being passed must be in row-major order
+   *
+   * @tparam OutputTensor
+   *   Type of output tensor
+   * @tparam InputOperator
+   *   Type of input tensor
+   * @param a_out
+   *   Output tensor
+   * @param a
+   *   Input tensor
+   * @param stream
+   *   CUDA stream
+   *
+   */
+  inline void ExecArgMax(OutputTensor &a_out,
+                       const InputOperator &a,
+                       const cudaStream_t stream)
+  {
+#ifdef __CUDACC__
+    MATX_NVTX_START("", matx::MATX_NVTX_LOG_INTERNAL)
+    typename detail::base_type_t<InputOperator> in_base = a;
+    typename detail::base_type_t<OutputTensor> out_base = a_out;
+
+    // Check whether this is a segmented reduction or single-value output. Segmented reductions are any
+    // type of reduction where there's not a single output, since any type of reduction can be generalized
+    // to a segmented type
+    if constexpr (OutputTensor::Rank() > 0) {
+      auto ft = [&](auto &&in, auto &&out, auto &&begin, auto &&end) {
+          return cub::DeviceSegmentedReduce::ArgMax(d_temp, temp_storage_bytes, in, out, static_cast<int>(TotalSize(out_base)), begin, end, stream);
+      };
+      auto rv = ReduceInput(ft, out_base, in_base);
+      MATX_ASSERT_STR_EXP(rv, cudaSuccess, matxCudaError, "Error in cub::DeviceSegmentedReduce::ArgMax");
+    }
+    else {
+      auto ft = [&](auto &&in, auto &&out, [[maybe_unused]] auto &&unused1, [[maybe_unused]] auto &&unused2) {
+        return cub::DeviceReduce::ArgMax(d_temp, temp_storage_bytes, in, out, static_cast<int>(TotalSize(in_base)), stream);
+      };
+      auto rv = ReduceInput(ft, out_base, in_base);
+      MATX_ASSERT_STR_EXP(rv, cudaSuccess, matxCudaError, "Error in cub::DevicdReduce::ArgMax");
+    }
+#endif
+  }  
 
 
 
@@ -1297,6 +1398,59 @@ void cub_min(OutputTensor &a_out, const InputOperator &a,
 }
 
 /**
+ * Find argmin of a tensor using CUB
+ *
+ * @tparam OutputTensor
+ *   Output tensor type
+ * @tparam InputOperator
+ *   Input tensor type
+ * @param a_out
+ *   Sorted tensor
+ * @param a
+ *   Input tensor
+ * @param stream
+ *   CUDA stream
+ */
+template <typename OutputTensor, typename InputOperator>
+void cub_argmin(OutputTensor &a_out, const InputOperator &a,
+          const cudaStream_t stream = 0)
+{
+#ifdef __CUDACC__
+  MATX_NVTX_START("", matx::MATX_NVTX_LOG_API)
+
+  static_assert(std::is_same_v<index_t, typename OutputTensor::scalar_type>, "Index tensor type for argmin must be index_t");
+
+#ifndef MATX_DISABLE_CUB_CACHE
+  auto params =
+      detail::matxCubPlan_t<OutputTensor,
+                            InputOperator,
+                            detail::CUB_OP_REDUCE_ARGMIN>::GetCubParams(a_out, a, stream);
+
+  // Get cache or new Sort plan if it doesn't exist
+  auto ret = detail::cub_cache.Lookup(params);
+  if (ret == std::nullopt) {
+    auto tmp = new detail::matxCubPlan_t<OutputTensor, InputOperator, detail::CUB_OP_REDUCE_ARGMIN>{
+        a_out, a, {}, stream};
+
+    tmp->ExecArgMin(a_out, a, stream);
+    detail::cub_cache.Insert(params, static_cast<void *>(tmp));
+  }
+  else {
+    auto type =
+        static_cast<detail::matxCubPlan_t<OutputTensor, InputOperator, detail::CUB_OP_REDUCE_ARGMIN> *>(
+            ret.value());
+    type->ExecArgMin(a_out, a, stream);
+  }
+#else
+  auto tmp = detail::matxCubPlan_t<OutputTensor, InputOperator, detail::CUB_OP_REDUCE_ARGMIN>{
+      a_out, a, {}, stream};
+
+  tmp.ExecArgMin(a_out, a, stream);
+#endif
+#endif
+}
+
+/**
  * Find max of a tensor using CUB
  *
  * @tparam OutputTensor
@@ -1343,6 +1497,61 @@ void cub_max(OutputTensor &a_out, const InputOperator &a,
 #endif
 #endif
 }
+
+
+/**
+ * Find argmax of a tensor using CUB
+ *
+ * @tparam OutputTensor
+ *   Output tensor type
+ * @tparam InputOperator
+ *   Input tensor type
+ * @param a_out
+ *   Sorted tensor
+ * @param a
+ *   Input tensor
+ * @param stream
+ *   CUDA stream
+ */
+template <typename OutputTensor, typename InputOperator>
+void cub_argmax(OutputTensor &a_out, const InputOperator &a,
+          const cudaStream_t stream = 0)
+{
+#ifdef __CUDACC__
+  MATX_NVTX_START("", matx::MATX_NVTX_LOG_API)
+
+  static_assert(std::is_same_v<index_t, typename OutputTensor::scalar_type>, "Index tensor type for argmax must be index_t");
+
+#ifndef MATX_DISABLE_CUB_CACHE
+  auto params =
+      detail::matxCubPlan_t<OutputTensor,
+                            InputOperator,
+                            detail::CUB_OP_REDUCE_ARGMAX>::GetCubParams(a_out, a, stream);
+
+  // Get cache or new Sort plan if it doesn't exist
+  auto ret = detail::cub_cache.Lookup(params);
+  if (ret == std::nullopt) {
+    auto tmp = new detail::matxCubPlan_t<OutputTensor, InputOperator, detail::CUB_OP_REDUCE_ARGMAX>{
+        a_out, a, {}, stream};
+
+    tmp->ExecArgMax(a_out, a, stream);
+    detail::cub_cache.Insert(params, static_cast<void *>(tmp));
+  }
+  else {
+    auto type =
+        static_cast<detail::matxCubPlan_t<OutputTensor, InputOperator, detail::CUB_OP_REDUCE_ARGMAX> *>(
+            ret.value());
+    type->ExecArgMax(a_out, a, stream);
+  }
+#else
+  auto tmp = detail::matxCubPlan_t<OutputTensor, InputOperator, detail::CUB_OP_REDUCE_ARGMAX>{
+      a_out, a, {}, stream};
+
+  tmp.ExecArgMax(a_out, a, stream);
+#endif
+#endif
+}
+
 
 /**
  * Sort rows of a tensor

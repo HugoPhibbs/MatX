@@ -463,15 +463,13 @@ TYPED_TEST(ReductionTestsFloatNonComplexNonHalfAllExecs, PermutedReduce)
     // example-begin argmax-test-2
     // Reduce a 4D tensor into a 2D tensor by collapsing the inner two dimensions. Both
     // examples permute the dimensions before the reduction    
-    (mtie(t2a, t2ai) = argmax(permute(t4,{2,3,0,1}))).run(exec);
-    (mtie(t2b, t2bi) = argmax(t4, {0,1})).run(exec);
+    (t2ai = argmax(permute(t4,{2,3,0,1}))).run(exec);
+    (t2bi = argmax(t4, {0,1})).run(exec);
     // example-end argmax-test-2
 
     exec.sync();
     for (index_t i = 0; i < t2a.Size(0); i++) {
       for (index_t j = 0; j < t2a.Size(1); j++) {
-        ASSERT_TRUE(MatXUtils::MatXTypeCompare(
-            t2a(i, j), t2b(i,j)));
         ASSERT_TRUE(MatXUtils::MatXTypeCompare(
             t2ai(i, j), t2bi(i,j)));
       }
@@ -483,15 +481,13 @@ TYPED_TEST(ReductionTestsFloatNonComplexNonHalfAllExecs, PermutedReduce)
     // example-begin argmin-test-2
     // Reduce a 4D tensor into a 2D tensor by collapsing the inner two dimensions. Both
     // examples permute the dimensions before the reduction
-    (mtie(t2a, t2ai) = argmin(permute(t4,{2,3,0,1}))).run(exec);
-    (mtie(t2b, t2bi) = argmin(t4, {0,1})).run(exec);
+    (t2ai = argmin(permute(t4,{2,3,0,1}))).run(exec);
+    (t2bi = argmin(t4, {0,1})).run(exec);
     // example-end argmin-test-2
 
     exec.sync();
     for (index_t i = 0; i < t2a.Size(0); i++) {
       for (index_t j = 0; j < t2a.Size(1); j++) {
-        ASSERT_TRUE(MatXUtils::MatXTypeCompare(
-            t2a(i, j), t2b(i,j)));
         ASSERT_TRUE(MatXUtils::MatXTypeCompare(
             t2ai(i, j), t2bi(i,j)));
       }
@@ -897,24 +893,21 @@ TYPED_TEST(ReductionTestsFloatNonComplexNonHalfAllExecs, ArgMax)
     ExecType exec{};
     using T = TestType;
     // example-begin argmax-test-1
-    auto t0 = make_tensor<TestType>({});
     auto t0i = make_tensor<index_t>({});
     auto t1o = make_tensor<TestType>({11});
 
     t1o.SetVals({(T)1, (T)3, (T)8, (T)2, (T)9, (T)10, (T)6, (T)7, (T)4, (T)5, (T)11});
 
-    (mtie(t0, t0i) = argmax(t1o)).run(exec);
+    (t0i = argmax(t1o)).run(exec);
     // example-end argmax-test-1
     exec.sync();
-    EXPECT_TRUE(MatXUtils::MatXTypeCompare(t0(), (TestType)(11)));
     EXPECT_TRUE(MatXUtils::MatXTypeCompare(t0i(), (TestType)(10)));    
 
-    tensor_t<TestType, 2> t2o{{2, 5}};
-    tensor_t<TestType, 1> t1o_small{{2}};    
+    tensor_t<TestType, 2> t2o{{2, 5}}; 
     tensor_t<index_t, 1> t1i_small{{2}};
     t2o.SetVals({{(T)2, (T)4, (T)1, (T)3, (T)5}, {(T)3, (T)1, (T)5, (T)2, (T)4}});    
         
-    (mtie(t1o_small, t1i_small) = argmax(t2o, {1})).run(exec);
+    (t1i_small = argmax(t2o, {1})).run(exec);
     exec.sync();
 
     auto rel = GetIdxFromAbs(t2o, t1i_small(0));
@@ -936,24 +929,21 @@ TYPED_TEST(ReductionTestsFloatNonComplexNonHalfAllExecs, ArgMin)
     ExecType exec{};
     using T = TestType;
     // example-begin argmin-test-1
-    auto t0 = make_tensor<TestType>({});
     auto t0i = make_tensor<index_t>({});
     auto t1o = make_tensor<TestType>({11});
 
     t1o.SetVals({(T)1, (T)3, (T)8, (T)2, (T)9, (T)10, (T)6, (T)7, (T)4, (T)5, (T)11});
 
-    (mtie(t0, t0i) = argmin(t1o)).run(exec);
+    (t0i = argmin(t1o)).run(exec);
     // example-end argmin-test-1
     exec.sync();
-    EXPECT_TRUE(MatXUtils::MatXTypeCompare(t0(), (TestType)(1)));
     EXPECT_TRUE(MatXUtils::MatXTypeCompare(t0i(), (TestType)(0)));    
 
-    tensor_t<TestType, 2> t2o{{2, 5}};
-    tensor_t<TestType, 1> t1o_small{{2}};    
+    tensor_t<TestType, 2> t2o{{2, 5}}; 
     tensor_t<index_t, 1> t1i_small{{2}};    
     t2o.SetVals({{(T)2, (T)4, (T)1, (T)3, (T)5}, {(T)3, (T)1, (T)5, (T)2, (T)4}});
 
-    (mtie(t1o_small, t1i_small) = argmin(t2o, {1})).run(exec);
+    (t1i_small = argmin(t2o, {1})).run(exec);
     exec.sync();
     
     auto rel = GetIdxFromAbs(t2o, t1i_small(0));

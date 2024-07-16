@@ -3,7 +3,7 @@
 argmax
 ======
 
-Returns both the maximum values and the indices of the maximum values across the input operator
+Returns the indices of the maximum values across the input operator
 
 .. doxygenfunction:: argmax(const InType &in, const int (&dims)[D])
 .. doxygenfunction:: argmax(const InType &in)

@@ -3,7 +3,7 @@
 argmin
 ======
 
-Returns both the minimum values and the indices of the minimum values across the input operator
+Returns the indices of the minimum values across the input operator
 
 .. doxygenfunction:: argmin(const InType &in, const int (&dims)[D])
 .. doxygenfunction:: argmin(const InType &in)
