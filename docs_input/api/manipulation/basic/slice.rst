@@ -7,6 +7,8 @@ Slice an operator with new start and end points, and optionally new strides. Sli
 be used to drop ranks, for operations such as selecting a single row. Negative indices can be used 
 to indicate starting at the end and going backward.
 
+As is typical with slice operations along any given dimension of a tensor, the start index is treated as inclusive, and the end index as exclusive.
+
 .. doxygenfunction:: slice(const OpType opIn, const index_t (&starts)[OpType::Rank()], const index_t (&ends)[OpType::Rank()])
 .. doxygenfunction:: slice(const OpType op, const index_t (&starts)[OpType::Rank()], const index_t (&ends)[OpType::Rank()], const index_t (&strides)[OpType::Rank()])
 
